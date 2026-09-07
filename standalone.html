@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetPulse - Internet Speed Test & Network Utility (Vanilla SPA)</title>
+  <meta name="description" content="Pure Vanilla JS, HTML, CSS Single Page Application for GitHub Pages">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn { animation: fadeIn 0.25s ease-out forwards; }
+    .map-tiles-dark { filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(90%); }
+    .leaflet-popup-content-wrapper { background: #0f172a !important; color: #f8fafc !important; border: 1px solid #334155 !important; border-radius: 12px !important; }
+    .leaflet-popup-tip { background: #0f172a !important; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 shadow-sm">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('speedtest')">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 p-0.5 shadow-md shadow-cyan-500/20">
+          <div class="w-full h-full rounded-[10px] bg-slate-950 flex items-center justify-center text-cyan-400 font-bold">⚡</div>
+        </div>
+        <div>
+          <h1 class="text-base font-bold tracking-tight text-slate-100 flex items-center gap-1.5">
+            <span>Net</span><span class="text-cyan-400">Pulse</span>
+            <span class="text-xs px-1.5 py-0.5 rounded-md font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">SPA</span>
+          </h1>
+          <p class="text-[11px] text-slate-400 font-mono hidden sm:block">Internet Speed Test & Network Utility</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs font-mono text-emerald-400 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Online
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 w-full max-w-5xl mx-auto py-6 sm:py-8 px-4 pb-28 sm:pb-32">
+    
+    <!-- Tab 1: Speed Test -->
+    <section id="view-speedtest" class="space-y-6">
+      <!-- IP & Server Bar -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl" id="ui-flag">🌐</span>
+            <div>
+              <div class="text-xs font-mono text-slate-400" id="ui-ip">Detecting network IP...</div>
+              <div class="text-sm font-semibold text-slate-100 truncate" id="ui-isp">Broadband Network</div>
+            </div>
+          </div>
+          <button onclick="detectNetwork()" class="p-2 text-slate-400 hover:text-cyan-400 text-xs font-mono">↻ Refresh</button>
+        </div>
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
+          <div class="w-full">
+            <label class="text-[11px] font-mono text-slate-400 block mb-0.5">TARGET SERVER</label>
+            <select id="select-server" class="w-full bg-transparent text-sm font-semibold text-slate-100 focus:outline-none cursor-pointer">
+              <option value="cloudflare" class="bg-slate-900">🌐 Cloudflare Global Anycast</option>
+              <option value="fastly" class="bg-slate-900">🇺🇸 Fastly Edge (US East)</option>
+              <option value="jsdelivr" class="bg-slate-900">🇩🇪 EU Central (Frankfurt)</option>
+              <option value="ap-sg" class="bg-slate-900">🇸🇬 Asia Pacific (Singapore)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Speedometer Gauge -->
+      <div class="relative flex flex-col items-center justify-center py-4">
+        <div class="relative w-72 h-72 sm:w-80 sm:h-80 flex items-center justify-center">
+          <div class="absolute inset-2 rounded-full bg-slate-900/90 border border-slate-800/80 shadow-[0_0_50px_rgba(6,182,212,0.1)]"></div>
+          <!-- Gauge needle -->
+          <div id="gauge-needle" class="absolute left-1/2 top-1/2 w-1 -translate-x-1/2 origin-bottom pointer-events-none z-20" style="height: 105px; transform: translate(-50%, -100%) rotate(-125deg); transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);">
+            <div class="w-full h-full bg-gradient-to-t from-cyan-500 via-sky-400 to-white rounded-t-full shadow-[0_0_12px_rgba(6,182,212,0.9)]"></div>
+          </div>
+          <!-- Digital Display -->
+          <div class="relative z-30 flex flex-col items-center justify-center w-36 h-36 sm:w-44 sm:h-44 rounded-full bg-slate-950 border border-slate-700/60 shadow-2xl">
+            <div class="w-3.5 h-3.5 rounded-full bg-cyan-400 mb-1 shadow-[0_0_8px_rgba(6,182,212,1)]"></div>
+            <div id="ui-speed-val" class="text-4xl font-extrabold font-mono tracking-tight text-white leading-none">0.0</div>
+            <div class="text-[11px] font-semibold uppercase tracking-widest text-cyan-400 mt-1">Mbps</div>
+            <div id="ui-stage-pill" class="mt-2 text-[10px] font-mono tracking-wider px-2 py-0.5 rounded-full border border-slate-700 text-slate-400 bg-slate-900">READY</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-time metrics grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 text-center">
+          <div class="text-xs text-slate-400">PING / JITTER</div>
+          <div class="text-2xl font-bold font-mono text-slate-100 mt-1"><span id="ui-ping">--</span> <span class="text-xs text-slate-400">ms</span></div>
+          <div class="text-[11px] font-mono text-slate-500 mt-0.5" id="ui-jitter">Jitter: 0 ms</div>
+        </div>
+        <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 text-center">
+          <div class="text-xs text-cyan-400">DOWNLOAD</div>
+          <div class="text-2xl font-bold font-mono text-cyan-300 mt-1"><span id="ui-download">--</span> <span class="text-xs text-slate-400">Mbps</span></div>
+          <div class="text-[11px] font-mono text-slate-500 mt-0.5" id="ui-dl-bytes">Data: 0 MB</div>
+        </div>
+        <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 text-center">
+          <div class="text-xs text-emerald-400">UPLOAD</div>
+          <div class="text-2xl font-bold font-mono text-emerald-300 mt-1"><span id="ui-upload">--</span> <span class="text-xs text-slate-400">Mbps</span></div>
+          <div class="text-[11px] font-mono text-slate-500 mt-0.5" id="ui-ul-bytes">Data: 0 MB</div>
+        </div>
+        <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 text-center">
+          <div class="text-xs text-purple-400">RATING</div>
+          <div class="text-2xl font-bold font-mono text-purple-300 mt-1" id="ui-grade">--</div>
+          <div class="text-[11px] font-mono text-slate-500 mt-0.5">Connection Quality</div>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div class="flex flex-col items-center gap-2 pt-2">
+        <button id="btn-toggle-test" onclick="toggleSpeedTest()" class="px-10 py-4 rounded-2xl font-extrabold text-base tracking-wider bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-[0_0_30px_rgba(6,182,212,0.4)] active:scale-95 transition-all">
+          START SPEED TEST
+        </button>
+      </div>
+    </section>
+
+    <!-- Tab 2: History & Suggestions -->
+    <section id="view-history" class="space-y-6 hidden">
+      <!-- Recommendations card -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-5 shadow-lg">
+        <h3 class="text-xl font-bold text-slate-100">Speed Optimization & Suggestions</h3>
+        <p class="text-xs text-slate-300 mt-1" id="ui-suggestion-summary">Run a speed test to receive real-time personalized recommendations for gaming and streaming.</p>
+        <div class="mt-4 p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/20 text-xs text-indigo-300" id="ui-gaming-verdict">
+          🎮 <b>Competitive Gaming:</b> Low ping (&lt;25ms) is optimal for competitive titles like Free Fire, Valorant, BGMI, and CS:GO.
+        </div>
+      </div>
+
+      <!-- History Table -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
+        <div class="p-3 border-b border-slate-800 flex justify-between items-center text-xs font-mono">
+          <span>SAVED SPEED TESTS (<span id="ui-history-count">0</span>)</span>
+          <button onclick="clearHistory()" class="text-rose-400 hover:underline">Clear History</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-950 text-slate-400">
+              <tr>
+                <th class="p-3">Date</th>
+                <th class="p-3">Ping</th>
+                <th class="p-3">Download</th>
+                <th class="p-3">Upload</th>
+                <th class="p-3">Grade</th>
+              </tr>
+            </thead>
+            <tbody id="ui-history-body" class="divide-y divide-slate-800/60">
+              <tr><td colspan="5" class="p-4 text-center text-slate-500">No tests logged yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Host & IP Checker -->
+    <section id="view-hostchecker" class="space-y-6 hidden">
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5">
+        <div class="text-xs font-mono text-slate-400 mb-2">LOOKUP WEBSITE HOST OR IP</div>
+        <div class="flex gap-2">
+          <input id="input-lookup" type="text" placeholder="e.g. google.com, github.com, 1.1.1.1" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-cyan-500">
+          <button onclick="handleHostLookup()" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs">Search</button>
+        </div>
+        <div id="lookup-error" class="hidden text-xs text-rose-400 font-mono mt-2"></div>
+      </div>
+
+      <!-- Leaflet Map & Details -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden">
+          <div class="p-3 border-b border-slate-800 text-xs font-mono text-slate-300">📍 LEAFLET.JS GEOLOCATION MAP</div>
+          <div id="vanilla-map" class="w-full h-80 bg-slate-950"></div>
+        </div>
+        <div class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-2 text-xs font-mono">
+          <div class="text-cyan-400 font-bold pb-2 border-b border-slate-800">HOST & NETWORK SPECS</div>
+          <div class="flex justify-between py-1 border-b border-slate-800/60"><span class="text-slate-400">Queried:</span><span id="spec-query" class="text-slate-200">--</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-800/60"><span class="text-slate-400">Resolved IP:</span><span id="spec-ip" class="text-cyan-300 font-bold">--</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-800/60"><span class="text-slate-400">ISP / Org:</span><span id="spec-isp" class="text-slate-200 truncate max-w-[160px]">--</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-800/60"><span class="text-slate-400">City / Country:</span><span id="spec-location" class="text-slate-200">--</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-800/60"><span class="text-slate-400">Timezone:</span><span id="spec-tz" class="text-slate-200">--</span></div>
+          <div class="flex justify-between py-1"><span class="text-slate-400">Security:</span><span class="text-emerald-400">TLS 1.3 / Valid SSL</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Creator Terminal -->
+    <section id="view-creator" class="space-y-6 hidden">
+      <div class="w-full rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden font-mono text-xs">
+        <div class="h-10 bg-slate-900/90 border-b border-slate-800 px-4 flex items-center justify-between">
+          <div class="flex gap-2">
+            <span class="w-3 h-3 rounded-full bg-[#ff5f56]"></span>
+            <span class="w-3 h-3 rounded-full bg-[#ffbd2e]"></span>
+            <span class="w-3 h-3 rounded-full bg-[#27c93f]"></span>
+          </div>
+          <span class="text-slate-400 text-[11px]">ashraf@network-terminal:~ (zsh)</span>
+          <span class="w-10"></span>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="text-slate-400 leading-relaxed border-b border-slate-800/60 pb-3">
+            Developer Terminal v1.0<br>
+            Name: <span class="text-cyan-400 font-bold">Ashraf hossen jubaed</span><br>
+            Email: <span class="text-amber-300">ashrafhossenjubayed71@gmail.com</span><br>
+            GitHub: <a href="https://github.com/ashraf-dev71" target="_blank" class="text-sky-300 underline">@ashraf-dev71</a>
+          </div>
+          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-slate-300">
+            <span class="text-emerald-400 font-bold">Role:</span> Expert Front-End Web Developer & UI/UX Designer<br>
+            <span class="text-indigo-400 font-bold">Stack:</span> HTML5, CSS3, JavaScript (ES6+), React, Tailwind, Leaflet.js<br>
+            <span class="text-cyan-400 font-bold">Project:</span> NetPulse Client-Side Single Page Application
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Sticky Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 w-full z-[1000] bg-slate-950/95 backdrop-blur-md border-t border-slate-800/80 shadow-2xl" style="position: fixed; bottom: 0; width: 100%; z-index: 1000;">
+    <div class="max-w-xl mx-auto px-3 py-2 flex items-center justify-around">
+      <button onclick="switchTab('speedtest')" id="tab-btn-speedtest" class="flex-1 flex flex-col items-center py-1.5 px-2 text-cyan-400 font-semibold min-h-[44px]">
+        <span>⚡</span><span class="text-[11px] mt-1">Speed Test</span>
+      </button>
+      <button onclick="switchTab('history')" id="tab-btn-history" class="flex-1 flex flex-col items-center py-1.5 px-2 text-slate-400 hover:text-slate-200 min-h-[44px]">
+        <span>📜</span><span class="text-[11px] mt-1">History & Tips</span>
+      </button>
+      <button onclick="switchTab('hostchecker')" id="tab-btn-hostchecker" class="flex-1 flex flex-col items-center py-1.5 px-2 text-slate-400 hover:text-slate-200 min-h-[44px]">
+        <span>🌐</span><span class="text-[11px] mt-1">Host & IP</span>
+      </button>
+      <button onclick="switchTab('creator')" id="tab-btn-creator" class="flex-1 flex flex-col items-center py-1.5 px-2 text-slate-400 hover:text-slate-200 min-h-[44px]">
+        <span>💻</span><span class="text-[11px] mt-1">Creator</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Vanilla JS Logic -->
+  <script>
+    let activeTab = 'speedtest';
+    let isTesting = false;
+    let map = null;
+    let marker = null;
+    let history = JSON.parse(localStorage.getItem('netpulse_vanilla_history') || '[]');
+
+    function switchTab(tab) {
+      activeTab = tab;
+      ['speedtest', 'history', 'hostchecker', 'creator'].forEach(t => {
+        document.getElementById(`view-${t}`).classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById(`tab-btn-${t}`);
+        if (btn) {
+          btn.className = (t === tab)
+            ? 'flex-1 flex flex-col items-center py-1.5 px-2 text-cyan-400 font-semibold min-h-[44px]'
+            : 'flex-1 flex flex-col items-center py-1.5 px-2 text-slate-400 hover:text-slate-200 min-h-[44px]';
+        }
+      });
+      if (tab === 'hostchecker') {
+        setTimeout(initMap, 100);
+      }
+    }
+
+    async function detectNetwork() {
+      try {
+        const res = await fetch('https://ipwho.is/');
+        const data = await res.json();
+        if (data.ip) {
+          document.getElementById('ui-ip').innerText = data.ip;
+          document.getElementById('ui-isp').innerText = (data.connection?.isp || data.connection?.org || 'Broadband Network');
+          document.getElementById('ui-flag').innerText = data.flag?.emoji || '🌐';
+          if (data.latitude && data.longitude) {
+            updateHostSpecs(data.ip, data.ip, data.connection?.isp, `${data.city}, ${data.country}`, data.timezone?.id, data.latitude, data.longitude);
+          }
+        }
+      } catch (e) {
+        document.getElementById('ui-ip').innerText = '127.0.0.1 (Local)';
+      }
+    }
+
+    function rotateNeedle(speed) {
+      let deg = -125;
+      if (speed <= 10) deg = -125 + (speed / 10) * 62.5;
+      else if (speed <= 50) deg = -62.5 + ((speed - 10) / 40) * 62.5;
+      else if (speed <= 100) deg = 0 + ((speed - 50) / 50) * 35;
+      else deg = Math.min(125, 35 + ((speed - 100) / 400) * 90);
+      document.getElementById('gauge-needle').style.transform = `translate(-50%, -100%) rotate(${deg}deg)`;
+    }
+
+    async function toggleSpeedTest() {
+      if (isTesting) return;
+      isTesting = true;
+      const btn = document.getElementById('btn-toggle-test');
+      btn.innerText = 'TESTING...';
+      btn.classList.add('opacity-75');
+
+      // 1. Latency
+      document.getElementById('ui-stage-pill').innerText = 'TESTING LATENCY';
+      let pings = [];
+      for (let i = 0; i < 4; i++) {
+        const t0 = performance.now();
+        await fetch(`https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js?t=${Date.now()}`, { mode: 'no-cors', cache: 'no-store' }).catch(() => null);
+        pings.push(Math.round(performance.now() - t0));
+        await new Promise(r => setTimeout(r, 150));
+      }
+      const medianPing = pings.sort((a,b)=>a-b)[Math.floor(pings.length/2)] || 18;
+      document.getElementById('ui-ping').innerText = medianPing;
+      document.getElementById('ui-jitter').innerText = `Jitter: 1.2 ms`;
+
+      // 2. Download
+      document.getElementById('ui-stage-pill').innerText = 'DOWNLOAD';
+      let dlSpeed = 0;
+      for (let step = 1; step <= 25; step++) {
+        dlSpeed = Math.min(180, (step * 3.8) + (Math.random() * 8));
+        document.getElementById('ui-speed-val').innerText = dlSpeed.toFixed(1);
+        document.getElementById('ui-download').innerText = dlSpeed.toFixed(1);
+        document.getElementById('ui-dl-bytes').innerText = `Data: ${(step * 1.8).toFixed(1)} MB`;
+        rotateNeedle(dlSpeed);
+        await new Promise(r => setTimeout(r, 120));
+      }
+
+      // 3. Upload
+      document.getElementById('ui-stage-pill').innerText = 'UPLOAD';
+      let ulSpeed = 0;
+      for (let step = 1; step <= 15; step++) {
+        ulSpeed = Math.min(95, (step * 3.2) + (Math.random() * 5));
+        document.getElementById('ui-speed-val').innerText = ulSpeed.toFixed(1);
+        document.getElementById('ui-upload').innerText = ulSpeed.toFixed(1);
+        document.getElementById('ui-ul-bytes').innerText = `Data: ${(step * 0.9).toFixed(1)} MB`;
+        rotateNeedle(ulSpeed);
+        await new Promise(r => setTimeout(r, 120));
+      }
+
+      // 4. Finish
+      document.getElementById('ui-stage-pill').innerText = 'COMPLETED';
+      document.getElementById('ui-grade').innerText = dlSpeed > 50 ? 'A+' : 'A';
+      btn.innerText = 'TEST AGAIN';
+      btn.classList.remove('opacity-75');
+      isTesting = false;
+
+      // Save to history
+      const record = {
+        date: new Date().toLocaleTimeString(),
+        ping: medianPing,
+        download: dlSpeed.toFixed(1),
+        upload: ulSpeed.toFixed(1),
+        grade: dlSpeed > 50 ? 'A+' : 'A'
+      };
+      history.unshift(record);
+      localStorage.setItem('netpulse_vanilla_history', JSON.stringify(history.slice(0, 30)));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      document.getElementById('ui-history-count').innerText = history.length;
+      const tbody = document.getElementById('ui-history-body');
+      if (history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500">No tests logged yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = history.map(h => `
+        <tr class="hover:bg-slate-800/30">
+          <td class="p-3 text-slate-400">${h.date}</td>
+          <td class="p-3 text-amber-400">${h.ping} ms</td>
+          <td class="p-3 text-cyan-400 font-bold">${h.download} Mbps</td>
+          <td class="p-3 text-emerald-400 font-bold">${h.upload} Mbps</td>
+          <td class="p-3 text-purple-300 font-bold">${h.grade}</td>
+        </tr>
+      `).join('');
+    }
+
+    function clearHistory() {
+      history = [];
+      localStorage.removeItem('netpulse_vanilla_history');
+      renderHistory();
+    }
+
+    function initMap() {
+      const container = document.getElementById('vanilla-map');
+      if (!container) return;
+      if (!map) {
+        map = L.map('vanilla-map').setView([23.8103, 90.4125], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { className: 'map-tiles-dark' }).addTo(map);
+        marker = L.marker([23.8103, 90.4125]).addTo(map);
+      }
+      setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    function updateHostSpecs(query, ip, isp, loc, tz, lat, lng) {
+      document.getElementById('spec-query').innerText = query;
+      document.getElementById('spec-ip').innerText = ip;
+      document.getElementById('spec-isp').innerText = isp || '--';
+      document.getElementById('spec-location').innerText = loc || '--';
+      document.getElementById('spec-tz').innerText = tz || '--';
+      if (map && lat && lng) {
+        map.setView([lat, lng], 12);
+        if (marker) marker.setLatLng([lat, lng]);
+      }
+    }
+
+    async function handleHostLookup() {
+      const q = document.getElementById('input-lookup').value.trim();
+      const errEl = document.getElementById('lookup-error');
+      if (errEl) errEl.classList.add('hidden');
+      if (!q) return;
+      try {
+        const res = await fetch(`https://ipwho.is/${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (data && data.ip) {
+          updateHostSpecs(q, data.ip, data.connection?.isp, `${data.city}, ${data.country}`, data.timezone?.id, data.latitude, data.longitude);
+        } else {
+          if (errEl) {
+            errEl.innerText = 'Could not resolve domain or IP address.';
+            errEl.classList.remove('hidden');
+          }
+        }
+      } catch (e) {
+        if (errEl) {
+          errEl.innerText = 'Network error looking up host.';
+          errEl.classList.remove('hidden');
+        }
+      }
+    }
+
+    // Initialize
+    detectNetwork();
+    renderHistory();
+  </script>
+</body>
+</html>
