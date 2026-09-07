@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@layer utilities {
+  /* Leaflet dark tile inversion & hue shifting for seamless dark mode */
+  .map-tiles-dark {
+    filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(90%);
+  }
+
+  /* Custom Leaflet popup styling in dark theme */
+  .leaflet-popup-content-wrapper {
+    background: #0f172a !important;
+    color: #f8fafc !important;
+    border: 1px solid #334155 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+  }
+  .leaflet-popup-tip {
+    background: #0f172a !important;
+  }
+
+  /* Smooth fade in */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.25s ease-out forwards;
+  }
+}

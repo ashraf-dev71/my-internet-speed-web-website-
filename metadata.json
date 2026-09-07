@@ -1,0 +1,6 @@
+{
+  "name": "NetPulse - Internet Speed Test & Network Utility",
+  "description": "NetPulse: A responsive, client-side Internet Speed Test and Network Utility SPA featuring real-time speedometer gauge, IP & ISP detection, host checker with Leaflet map, speed history, and device diagnostic tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
