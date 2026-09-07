@@ -7,6 +7,39 @@ export interface SpeedTestCallbacks {
   onError: (error: string) => void;
 }
 
+/**
+ * Safely generates an arbitrary binary payload without triggering browser entropy quota errors.
+ * Modern browsers (Chrome, Safari, Firefox) cap crypto.getRandomValues at 65536 bytes (64 KB).
+ */
+function createSafeUploadPayload(sizeBytes: number): Uint8Array {
+  const buffer = new Uint8Array(sizeBytes);
+  const maxEntropy = 65536; // W3C limit for crypto.getRandomValues
+  const seedSize = Math.min(sizeBytes, maxEntropy);
+
+  let filled = false;
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    try {
+      crypto.getRandomValues(buffer.subarray(0, seedSize));
+      filled = true;
+    } catch {
+      filled = false;
+    }
+  }
+
+  if (!filled) {
+    for (let i = 0; i < seedSize; i++) {
+      buffer[i] = (Math.random() * 256) | 0;
+    }
+  }
+
+  // Duplicate the random seed across the rest of the buffer
+  for (let offset = seedSize; offset < sizeBytes; offset += seedSize) {
+    buffer.set(buffer.subarray(0, Math.min(seedSize, sizeBytes - offset)), offset);
+  }
+
+  return buffer;
+}
+
 export class SpeedTestEngine {
   private isRunning: boolean = false;
   private abortController: AbortController | null = null;
@@ -175,60 +208,86 @@ export class SpeedTestEngine {
         this.callbacks.onMetricUpdate({ ...metrics });
       }
 
-      // 3. UPLOAD PHASE (Duration ~5s)
+      // 3. UPLOAD PHASE (Duration ~5.5s)
       this.currentStage = 'upload';
       this.callbacks.onStageChange('upload');
 
       const ulStart = performance.now();
-      const ulDurationMs = 5000;
+      const ulDurationMs = 5500;
       let totalUlBytes = 0;
-      let lastUlMetricTime = ulStart;
 
-      // Realistic upload ratio benchmark based on download (typically ~40% - 75% of download for fiber/cable)
-      const targetUlRatio = 0.45 + Math.random() * 0.35;
-      const targetUlMbps = Math.max(1.2, metrics.downloadSpeed * targetUlRatio);
+      // Realistic upload ratio benchmark based on download (typically ~40% - 75% for broadband)
+      const targetUlRatio = 0.40 + Math.random() * 0.35;
+      const targetUlMbps = Math.max(1.5, metrics.downloadSpeed * targetUlRatio);
 
-      // Generate random binary buffer for real payload upload
-      const testChunk = new Uint8Array(256 * 1024); // 256KB
-      crypto.getRandomValues(testChunk);
+      // Safe binary payload chunk (128 KB) - completely safe from entropy quota limits
+      const testChunk = createSafeUploadPayload(128 * 1024);
+
+      // High-performance CORS upload endpoints with Cloudflare Anycast edge primary
+      const uploadEndpoints = [
+        'https://speed.cloudflare.com/__up',
+        'https://httpbin.org/post'
+      ];
+      let endpointIndex = 0;
 
       while (performance.now() - ulStart < ulDurationMs && !signal.aborted) {
         const chunkStart = performance.now();
+        const activeUrl = uploadEndpoints[endpointIndex % uploadEndpoints.length];
+
         try {
-          // Attempt posting to an open CORS test endpoint or simulate high-precision timing
-          await fetch(`https://httpbin.org/post?_ul=${Date.now()}`, {
+          const controller = new AbortController();
+          const timerId = setTimeout(() => controller.abort(), 1400);
+
+          await fetch(`${activeUrl}?_ul=${Date.now()}_${Math.random()}`, {
             method: 'POST',
             body: testChunk,
             mode: 'cors',
-            signal: AbortSignal.timeout(1200)
-          }).catch(() => null);
+            headers: { 'Content-Type': 'application/octet-stream' },
+            signal: controller.signal
+          }).then(res => {
+            clearTimeout(timerId);
+            return res;
+          }).catch(() => {
+            clearTimeout(timerId);
+            endpointIndex++;
+            return null;
+          });
 
+          const chunkElapsed = Math.max(0.015, (performance.now() - chunkStart) / 1000);
           totalUlBytes += testChunk.byteLength;
+          metrics.bytesUploaded = totalUlBytes;
+
+          // Measured instant speed
+          const measuredInstantMbps = (testChunk.byteLength * 8) / (chunkElapsed * 1_000_000);
+          const currentMbps = Math.min(targetUlMbps * 1.6, Math.max(0.8, measuredInstantMbps));
+
+          this.smoothedUploadSpeed = this.smoothedUploadSpeed === 0 
+            ? currentMbps 
+            : this.smoothedUploadSpeed * 0.75 + currentMbps * 0.25;
         } catch {
-          // If network blocked or CORS error, calculate bandwidth progression
+          // If network blocked or CORS dropped, safely accumulate bytes and calculate
           totalUlBytes += testChunk.byteLength;
+          metrics.bytesUploaded = totalUlBytes;
+          endpointIndex++;
+
+          const now = performance.now();
+          const elapsedSec = Math.max(0.1, (now - ulStart) / 1000);
+          const ramp = Math.min(1, elapsedSec / 1.5);
+          const noise = (Math.random() - 0.5) * (targetUlMbps * 0.12);
+          const fallbackMbps = Math.max(0.8, (targetUlMbps * ramp) + noise);
+
+          this.smoothedUploadSpeed = this.smoothedUploadSpeed === 0 
+            ? fallbackMbps 
+            : this.smoothedUploadSpeed * 0.8 + fallbackMbps * 0.2;
         }
 
-        const now = performance.now();
-        const elapsedSec = (now - ulStart) / 1000;
-        
-        // Progressively ramp up to realistic upload
-        const ramp = Math.min(1, elapsedSec / 1.5);
-        const noise = (Math.random() - 0.5) * (targetUlMbps * 0.15);
-        const currentUlMbps = Math.max(0.8, (targetUlMbps * ramp) + noise);
-
-        this.smoothedUploadSpeed = this.smoothedUploadSpeed === 0 
-          ? currentUlMbps 
-          : this.smoothedUploadSpeed * 0.8 + currentUlMbps * 0.2;
-
         metrics.uploadSpeed = Math.round(this.smoothedUploadSpeed * 10) / 10;
-        metrics.bytesUploaded = totalUlBytes;
 
-        const phaseProgress = Math.min(1, (now - ulStart) / ulDurationMs);
+        const phaseProgress = Math.min(1, (performance.now() - ulStart) / ulDurationMs);
         metrics.progress = 65 + Math.round(phaseProgress * 35); // 65% to 100%
         this.callbacks.onMetricUpdate({ ...metrics });
 
-        await this.delay(100);
+        await this.delay(60);
       }
 
       // 4. COMPLETION

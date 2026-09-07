@@ -7,18 +7,6 @@ export default defineConfig(() => {
   return {
     base: './',
     plugins: [react(), tailwindcss()],
-    build: {
-      rollupOptions: {
-        output: {
-          entryFileNames: 'assets/netpulse.js',
-          chunkFileNames: 'assets/[name].js',
-          assetFileNames: (assetInfo) =>
-            assetInfo.name?.endsWith('.css')
-              ? 'assets/netpulse.css'
-              : 'assets/[name][extname]',
-        },
-      },
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
