@@ -2,11 +2,16 @@
 
 > A modern, responsive, client-side Internet Speed Test and Network Utility Single Page Application (SPA) designed for zero-latency browser diagnostics and seamless hosting on **GitHub Pages**.
 
-[![Deploy to GitHub Pages](net-pulse.bdhyperashraf71.me)](https://github.com/ashraf-dev71/netpulse/actions/workflows/deploy.yml)
+[![Deploy to GitHub Pages](https://github.com/ashraf-dev71/netpulse/actions/workflows/deploy.yml/badge.svg)](https://github.com/ashraf-dev71/netpulse/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-cyan.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.2-purple.svg)](https://vitejs.dev/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.0-38bdf8.svg)](https://tailwindcss.com/)
+
+## Live Demo
+
+[Visit NetPulse](https://net-pulse.bdhyperashraf71.me)
+/)
 
 ---
 
