@@ -2,11 +2,11 @@
 
 > A modern, responsive, client-side Internet Speed Test and Network Utility Single Page Application (SPA) designed for zero-latency browser diagnostics and seamless hosting on **GitHub Pages**.
 
-[![Deploy to GitHub Pages](https://github.com/ashraf-dev71/netpulse/actions/workflows/deploy.yml/badge.svg)](https://github.com/ashraf-dev71/netpulse/actions/workflows/deploy.yml)
+[![Deploy to GitHub Pages](https://github.com/ashraf-dev71/my-internet-speed-web-website-/actions/workflows/deploy.yml/badge.svg)](https://github.com/ashraf-dev71/my-internet-speed-web-website-/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-cyan.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.2-purple.svg)](https://vitejs.dev/)
-[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.0-38bdf8.svg)](https://tailwindcss.com/)
+[![Vite](https://img.shields.io/badge/Vite-6.2-646cff.svg)](https://vitejs.dev/)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.1-38bdf8.svg)](https://tailwindcss.com/)
 
 ---
 
@@ -16,8 +16,14 @@
 - 🌍 **Automated IP & ISP Detection**: Instant lookup of public IP, Autonomous System Number (ASN), ISP, and approximate city/country.
 - 🗺️ **Interactive Leaflet.js Host Checker**: Query any domain or IPv4/IPv6 with dark-mode OpenStreetMap interactive pin and radius visualization.
 - 📊 **Local Test History & Analysis**: Persisted test history stored locally in browser with JSON export and instant connection tier grading (Gaming, 4K Streaming, Video Conferences).
+- 📡 **Live Telemetry & Audio Feedback**: Real-time test activity stream with optional browser audio cues during download and upload measurements.
 - 💻 **Dedicated Full Pages**: No clipping popups! Dedicated full page views for Creator Terminal, Privacy & Disclaimer, and GitHub Pages Deployment Guide.
 - 🚀 **100% Client-Side & GitHub Pages Ready**: Zero backend requirements, relative base paths (`base: './'`), automated CI/CD workflow included, and zero mixed-content warnings.
+
+## 🌐 Live Website
+
+Visit the deployed app at **[net-pulse.bdhyperashraf71.me](https://net-pulse.bdhyperashraf71.me/)**.
+Every push to `main` runs the GitHub Actions workflow and publishes the Vite production build to GitHub Pages.
 
 ---
 
@@ -47,6 +53,8 @@ This repository already includes `.github/workflows/deploy.yml`.
    ```
    https://<your-username>.github.io/<repo-name>/
    ```
+
+For a custom domain, add a `CNAME` file to the repository root and configure the same domain under **Settings** → **Pages**.
 
 ---
 
@@ -88,6 +96,15 @@ npm run lint
 # Compile production bundle
 npm run build
 ```
+
+The development server runs at `http://localhost:3000/`.
+
+### Troubleshooting a Blank Screen
+
+For the Vite build, GitHub Pages **Source** must be set to **GitHub Actions**.
+Using **Deploy from a branch** serves the source `index.html`, which references
+`/src/main.tsx` and does not include the compiled assets. After changing the
+setting, push to `main` or run the deployment workflow again.
 
 ---
 
