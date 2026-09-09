@@ -76,41 +76,39 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200 relative overflow-x-hidden">
       
+      {/* Ambient Soft Glow Background */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-b from-cyan-500/10 via-blue-500/5 to-transparent rounded-full blur-3xl opacity-70" />
+      </div>
+
       {/* Top Application Header */}
-      <header className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-40 w-full bg-[#090d16]/80 backdrop-blur-xl border-b border-white/[0.06]">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           
           {/* Logo and Brand */}
           <div 
             onClick={() => setActiveTab('speedtest')}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 p-0.5 shadow-md shadow-cyan-500/20 group-hover:scale-105 transition-transform duration-300">
-              <div className="w-full h-full rounded-[10px] bg-slate-950 flex items-center justify-center text-cyan-400">
-                <Zap className="w-5 h-5 fill-current" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-400 to-blue-500 p-0.5 shadow-md shadow-cyan-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-full h-full rounded-[10px] bg-[#090d16] flex items-center justify-center text-cyan-400">
+                <Zap className="w-4 h-4 fill-current" />
               </div>
             </div>
             <div>
               <h1 className="text-base font-bold tracking-tight text-slate-100 flex items-center gap-1.5">
-                <span>Net</span>
-                <span className="text-cyan-400">Pulse</span>
-                <span className="text-xs px-1.5 py-0.5 rounded-md font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                  NETWORK
-                </span>
+                <span>Net</span><span className="text-cyan-400">Pulse</span>
               </h1>
-              <p className="text-[11px] text-slate-400 font-mono hidden sm:block">
-                Network Utility & Diagnostics SPA
-              </p>
             </div>
           </div>
 
           {/* Right Header: Online Status & Top Corner Hamburger Menu */}
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,1)]" />
-              <span>{userNetwork ? userNetwork.country : 'Online'}</span>
+          <div className="flex items-center gap-2.5">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-xs text-slate-300 font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{userNetwork ? `${userNetwork.city || userNetwork.country}` : 'Online'}</span>
             </div>
 
             <TopCornerMenu 

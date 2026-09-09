@@ -8,11 +8,6 @@
 [![Vite](https://img.shields.io/badge/Vite-6.2-purple.svg)](https://vitejs.dev/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.0-38bdf8.svg)](https://tailwindcss.com/)
 
-## Live Demo
-
-[Visit NetPulse](https://net-pulse.bdhyperashraf71.me)
-/)
-
 ---
 
 ## 🌟 Highlights & Features

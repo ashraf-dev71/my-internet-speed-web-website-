@@ -1,195 +1,301 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { SpeedTestStage } from '../types';
+import { Volume2, VolumeX, ArrowDown, ArrowUp, Activity } from 'lucide-react';
 
 interface SpeedometerProps {
   speed: number;
   stage: SpeedTestStage;
-  maxScale?: number; // e.g. 100, 500, or 1000
+  maxScale?: number;
+  peakSpeed?: number;
+  isSoundEnabled?: boolean;
+  onToggleSound?: () => void;
+  speedHistoryPoints?: number[];
 }
 
 export const Speedometer: React.FC<SpeedometerProps> = ({
   speed,
   stage,
   maxScale = 500,
+  peakSpeed = 0,
+  isSoundEnabled = true,
+  onToggleSound,
 }) => {
-  // Speed is non-linear so lower speeds (1-25 Mbps) have visible resolution
-  // Range: -125 degrees to +125 degrees (250 degrees total sweep)
-  const needleRotation = useMemo(() => {
-    if (speed <= 0) return -125;
-    
-    // Logarithmic-linear hybrid scaling for realistic needle motion
-    // 0 -> -125deg
-    // 5 -> -85deg
-    // 25 -> -30deg
-    // 50 -> 0deg (top)
-    // 100 -> 35deg
-    // 250 -> 80deg
-    // 500+ -> 125deg
-    let ratio = 0;
-    if (speed <= 10) {
-      ratio = (speed / 10) * 0.25; // 0 to 0.25
-    } else if (speed <= 50) {
-      ratio = 0.25 + ((speed - 10) / 40) * 0.25; // 0.25 to 0.50
-    } else if (speed <= 100) {
-      ratio = 0.50 + ((speed - 50) / 50) * 0.20; // 0.50 to 0.70
-    } else if (speed <= 250) {
-      ratio = 0.70 + ((speed - 100) / 150) * 0.18; // 0.70 to 0.88
-    } else {
-      ratio = 0.88 + Math.min(1, (speed - 250) / (maxScale - 250)) * 0.12; // 0.88 to 1.0
-    }
+  const [internalPeak, setInternalPeak] = useState(0);
 
-    const deg = -125 + ratio * 250;
-    return Math.min(125, Math.max(-125, deg));
+  useEffect(() => {
+    if (stage === 'idle') {
+      setInternalPeak(0);
+    } else if (speed > internalPeak) {
+      setInternalPeak(speed);
+    }
+  }, [speed, stage, internalPeak]);
+
+  const effectivePeak = peakSpeed > 0 ? peakSpeed : internalPeak;
+
+  // Calculate sweep percentage (0 to 1) for 260 degrees arc
+  const sweepRatio = useMemo(() => {
+    if (speed <= 0) return 0;
+    if (speed <= 10) return (speed / 10) * 0.2;
+    if (speed <= 50) return 0.2 + ((speed - 10) / 40) * 0.25;
+    if (speed <= 100) return 0.45 + ((speed - 50) / 50) * 0.22;
+    if (speed <= 250) return 0.67 + ((speed - 100) / 150) * 0.2;
+    return Math.min(1, 0.87 + ((speed - 250) / (maxScale - 250)) * 0.13);
   }, [speed, maxScale]);
 
-  // Stage display label and theme colors
-  const stageInfo = useMemo(() => {
+  // Stage presentation config
+  const config = useMemo(() => {
     switch (stage) {
       case 'ping':
-        return { label: 'TESTING LATENCY', color: 'text-amber-400', border: 'border-amber-500/40', glow: 'shadow-amber-500/20' };
+        return {
+          label: 'Measuring Latency',
+          color: '#fbbf24',
+          glow: 'rgba(251, 191, 36, 0.25)',
+          gradId: 'amberGrad',
+          Icon: Activity,
+          textColor: 'text-amber-400',
+        };
       case 'download':
-        return { label: 'MEASURING DOWNLOAD', color: 'text-cyan-400', border: 'border-cyan-500/40', glow: 'shadow-cyan-500/20' };
+        return {
+          label: 'Downloading',
+          color: '#06b6d4',
+          glow: 'rgba(6, 182, 212, 0.28)',
+          gradId: 'cyanGrad',
+          Icon: ArrowDown,
+          textColor: 'text-cyan-400',
+        };
       case 'upload':
-        return { label: 'MEASURING UPLOAD', color: 'text-emerald-400', border: 'border-emerald-500/40', glow: 'shadow-emerald-500/20' };
+        return {
+          label: 'Uploading',
+          color: '#10b981',
+          glow: 'rgba(16, 185, 129, 0.28)',
+          gradId: 'emeraldGrad',
+          Icon: ArrowUp,
+          textColor: 'text-emerald-400',
+        };
       case 'completed':
-        return { label: 'TEST COMPLETE', color: 'text-indigo-300', border: 'border-indigo-500/40', glow: 'shadow-indigo-500/20' };
+        return {
+          label: 'Finished',
+          color: '#8b5cf6',
+          glow: 'rgba(139, 92, 246, 0.22)',
+          gradId: 'purpleGrad',
+          Icon: null,
+          textColor: 'text-purple-400',
+        };
       default:
-        return { label: 'READY TO TEST', color: 'text-slate-400', border: 'border-slate-700/60', glow: 'shadow-transparent' };
+        return {
+          label: 'Ready to Test',
+          color: '#38bdf8',
+          glow: 'rgba(56, 189, 248, 0.1)',
+          gradId: 'idleGrad',
+          Icon: null,
+          textColor: 'text-slate-400',
+        };
     }
   }, [stage]);
 
-  // Speedometer ticks
-  const ticks = [
-    { label: '0', deg: -125 },
-    { label: '1', deg: -105 },
-    { label: '5', deg: -85 },
-    { label: '10', deg: -62.5 },
-    { label: '25', deg: -30 },
-    { label: '50', deg: 0 },
-    { label: '100', deg: 35 },
-    { label: '250', deg: 80 },
-    { label: '500+', deg: 125 }
+  // SVG Geometry for a 260-degree circle arc
+  const radius = 145;
+  const strokeWidth = 10;
+  const circumference = 2 * Math.PI * radius; // ~911
+  const arcLength = (260 / 360) * circumference; // ~658
+  const strokeDashoffset = arcLength * (1 - sweepRatio);
+
+  // Angle for orbital beacon dot
+  // Start angle: 140deg, End angle: 400deg (260 deg sweep)
+  const currentAngleDeg = 140 + sweepRatio * 260;
+  const currentAngleRad = (currentAngleDeg * Math.PI) / 180;
+  const dotX = 180 + radius * Math.cos(currentAngleRad);
+  const dotY = 180 + radius * Math.sin(currentAngleRad);
+
+  const isTesting = stage !== 'idle' && stage !== 'completed';
+
+  // Minimal dial markers
+  const markers = [
+    { label: '0', ratio: 0 },
+    { label: '10', ratio: 0.2 },
+    { label: '50', ratio: 0.45 },
+    { label: '100', ratio: 0.67 },
+    { label: '250', ratio: 0.87 },
+    { label: '500+', ratio: 1 },
   ];
 
   return (
     <div className="relative flex flex-col items-center justify-center select-none py-2">
-      {/* Outer Glow & Background Disk */}
-      <div className="relative w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 flex items-center justify-center">
-        
-        {/* Ambient Ring Backdrop */}
-        <div className="absolute inset-2 rounded-full bg-slate-900/90 border border-slate-800/80 shadow-[0_0_50px_rgba(6,182,212,0.08)]" />
 
-        {/* Dynamic Pulsing Ring when Active */}
-        {stage !== 'idle' && stage !== 'completed' && (
-          <div className="absolute inset-0 rounded-full border border-cyan-500/20 animate-ping opacity-30 pointer-events-none" />
-        )}
+      {/* Sound Toggle (Clean & Minimal) */}
+      {onToggleSound && (
+        <button
+          onClick={onToggleSound}
+          id="btn-toggle-sound"
+          className="absolute -top-2 right-4 z-20 p-2 rounded-full text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all"
+          title={isSoundEnabled ? 'Mute sound effects' : 'Enable sound effects'}
+        >
+          {isSoundEnabled ? (
+            <Volume2 className="w-4 h-4 text-cyan-400" />
+          ) : (
+            <VolumeX className="w-4 h-4 text-slate-500" />
+          )}
+        </button>
+      )}
+
+      {/* Main Circular Speed Hub */}
+      <div className="relative w-[300px] h-[300px] sm:w-[360px] sm:h-[360px] flex items-center justify-center">
+
+        {/* Soft Ambient Dynamic Glow */}
+        <div
+          className="absolute inset-8 rounded-full transition-all duration-700 pointer-events-none blur-3xl opacity-60"
+          style={{ backgroundColor: config.glow }}
+        />
+
+        {/* Outer Minimal Subtle Ring */}
+        <div className="absolute inset-4 sm:inset-5 rounded-full border border-white/[0.05] pointer-events-none" />
 
         {/* SVG Dial Arc */}
-        <svg className="absolute inset-0 w-full h-full -rotate-90 transform" viewBox="0 0 360 360">
+        <svg
+          className="w-full h-full pointer-events-none"
+          viewBox="0 0 360 360"
+        >
           <defs>
-            <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#06b6d4" />
-              <stop offset="60%" stopColor="#3b82f6" />
-              <stop offset="100%" stopColor="#10b981" />
+            {/* Gradients */}
+            <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#38bdf8" />
+              <stop offset="50%" stopColor="#06b6d4" />
+              <stop offset="100%" stopColor="#0284c7" />
             </linearGradient>
-            <filter id="gaugeGlow">
-              <feGaussianBlur stdDeviation="3" result="glow" />
-              <feComposite in="SourceGraphic" in2="glow" operator="over" />
+            <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#34d399" />
+              <stop offset="100%" stopColor="#059669" />
+            </linearGradient>
+            <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fde047" />
+              <stop offset="100%" stopColor="#f59e0b" />
+            </linearGradient>
+            <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#c084fc" />
+              <stop offset="100%" stopColor="#7c3aed" />
+            </linearGradient>
+            <linearGradient id="idleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#38bdf8" />
+              <stop offset="100%" stopColor="#0284c7" />
+            </linearGradient>
+
+            <filter id="arcGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
             </filter>
           </defs>
 
-          {/* Background Track Arc (250 degrees from 145deg to 395deg) */}
+          {/* Background Track Arc */}
           <circle
             cx="180"
             cy="180"
-            r="140"
+            r={radius}
             fill="none"
-            stroke="#1e293b"
-            strokeWidth="10"
-            strokeDasharray="610"
-            strokeDashoffset="180"
+            stroke="rgba(255, 255, 255, 0.05)"
+            strokeWidth={strokeWidth}
             strokeLinecap="round"
-            className="transition-all duration-300"
+            strokeDasharray={`${arcLength} ${circumference}`}
+            transform="rotate(140 180 180)"
           />
 
-          {/* Active Colored Arc */}
+          {/* Active Gradient Speed Arc */}
           <circle
             cx="180"
             cy="180"
-            r="140"
+            r={radius}
             fill="none"
-            stroke="url(#gaugeGradient)"
-            strokeWidth="10"
-            strokeDasharray="610"
-            strokeDashoffset={Math.max(180, 610 - (((needleRotation + 125) / 250) * 430))}
+            stroke={`url(#${config.gradId})`}
+            strokeWidth={strokeWidth}
             strokeLinecap="round"
-            filter="url(#gaugeGlow)"
-            className="transition-all duration-300 ease-out"
+            strokeDasharray={`${arcLength} ${circumference}`}
+            strokeDashoffset={strokeDashoffset}
+            filter="url(#arcGlow)"
+            className="transition-all duration-200 ease-out"
+            transform="rotate(140 180 180)"
           />
-        </svg>
 
-        {/* Gauge Tick Marks and Labels */}
-        <div className="absolute inset-0 pointer-events-none">
-          {ticks.map((tick, idx) => {
-            const rad = ((tick.deg - 90) * Math.PI) / 180;
-            const r = 118; // radius for text
-            const cx = 50 + (r / 180) * 50 * Math.cos(rad);
-            const cy = 50 + (r / 180) * 50 * Math.sin(rad);
+          {/* Gliding Orbital Beacon Dot */}
+          {sweepRatio > 0 && (
+            <g className="transition-all duration-200 ease-out">
+              <circle
+                cx={dotX}
+                cy={dotY}
+                r="7"
+                fill={config.color}
+                opacity="0.3"
+                className={isTesting ? 'animate-ping' : ''}
+              />
+              <circle
+                cx={dotX}
+                cy={dotY}
+                r="4.5"
+                fill="#ffffff"
+                stroke={config.color}
+                strokeWidth="2.5"
+              />
+            </g>
+          )}
+
+          {/* Minimal Clean Scale Ticks */}
+          {markers.map((m, idx) => {
+            const angleDeg = 140 + m.ratio * 260;
+            const angleRad = (angleDeg * Math.PI) / 180;
+            const textR = radius - 20;
+            const tx = 180 + textR * Math.cos(angleRad);
+            const ty = 180 + textR * Math.sin(angleRad);
+            const isPassed = sweepRatio >= m.ratio && sweepRatio > 0;
 
             return (
-              <React.Fragment key={idx}>
-                {/* Major Tick Mark Line */}
-                <div
-                  className="absolute left-1/2 top-1/2 w-0.5 h-3 -translate-x-1/2 origin-bottom bg-slate-700/80"
-                  style={{
-                    transform: `translate(-50%, -100%) rotate(${tick.deg}deg) translateY(-128px)`,
-                  }}
-                />
-                {/* Number Label */}
-                <span
-                  className="absolute text-[11px] sm:text-xs font-mono font-medium text-slate-400/90 -translate-x-1/2 -translate-y-1/2"
-                  style={{ left: `${cx}%`, top: `${cy}%` }}
-                >
-                  {tick.label}
-                </span>
-              </React.Fragment>
+              <text
+                key={idx}
+                x={tx}
+                y={ty + 4}
+                textAnchor="middle"
+                className={`text-[10px] font-mono select-none transition-colors duration-200 ${
+                  isPassed ? 'fill-slate-200 font-semibold' : 'fill-slate-600'
+                }`}
+              >
+                {m.label}
+              </text>
             );
           })}
-        </div>
+        </svg>
 
-        {/* Rotating Needle (CSS transform: rotate() for realistic movement) */}
-        <div
-          id="speedometer-needle"
-          className="absolute left-1/2 top-1/2 w-1 -translate-x-1/2 origin-bottom pointer-events-none z-20"
-          style={{
-            height: '110px',
-            transform: `translate(-50%, -100%) rotate(${needleRotation}deg)`,
-            transition: 'transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          }}
-        >
-          {/* Needle Graphic with Neon Gradient & Glow */}
-          <div className="w-full h-full bg-gradient-to-t from-cyan-500 via-sky-400 to-white rounded-t-full shadow-[0_0_12px_rgba(6,182,212,0.8)]" />
-        </div>
+        {/* Center Minimal Display */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none z-10">
 
-        {/* Center Hub & Digital Readout */}
-        <div className="relative z-30 flex flex-col items-center justify-center w-36 h-36 sm:w-44 sm:h-44 rounded-full bg-slate-950 border border-slate-700/60 shadow-xl shadow-black/80">
-          {/* Small Pivot Dot */}
-          <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-cyan-400 to-sky-200 shadow-[0_0_8px_rgba(56,189,248,0.9)] mb-1" />
-
-          {/* Main Speed Value */}
-          <div className="text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-white leading-none">
-            {speed > 0 ? (speed >= 100 ? Math.round(speed) : speed.toFixed(1)) : '0.0'}
+          {/* Active Status Pill */}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] mb-1 backdrop-blur-md">
+            {config.Icon && (
+              <config.Icon className={`w-3.5 h-3.5 ${config.textColor} ${isTesting ? 'animate-bounce' : ''}`} />
+            )}
+            <span className={`text-xs font-medium ${config.textColor}`}>
+              {config.label}
+            </span>
           </div>
 
-          {/* Speed Unit */}
-          <div className="text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-cyan-400 mt-1">
+          {/* Huge Clean Speed Number */}
+          <div className="flex items-baseline justify-center tracking-tight font-extrabold text-white font-num leading-none my-1">
+            <span className="text-5xl sm:text-6xl drop-shadow-sm">
+              {speed > 0 ? (speed >= 100 ? speed.toFixed(0) : speed.toFixed(1)) : '0'}
+            </span>
+          </div>
+
+          {/* Mbps Unit Tag */}
+          <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase font-mono">
             Mbps
-          </div>
+          </span>
 
-          {/* Stage Mini Badge */}
-          <div className={`mt-2 text-[10px] font-mono tracking-wider px-2 py-0.5 rounded-full border ${stageInfo.border} ${stageInfo.color} bg-slate-900/80`}>
-            {stageInfo.label}
-          </div>
+          {/* Peak burst info if available */}
+          {effectivePeak > 0 && isTesting && (
+            <div className="text-[11px] font-mono text-slate-500 mt-2">
+              Peak: <span className="text-slate-300 font-medium">{effectivePeak.toFixed(1)} Mbps</span>
+            </div>
+          )}
+
         </div>
 
       </div>
